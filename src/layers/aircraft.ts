@@ -1,5 +1,6 @@
 import { Popup, type GeoJSONSource, type Map as MlMap, type MapLayerMouseEvent } from "maplibre-gl";
 import { FEED_MODE, fixtureUrl } from "../config";
+import { LOCAL_RELAY, onRelayChange, relayUrl } from "../relay";
 import { loadString, saveString } from "../storage";
 import { DataLayer, EMPTY, fetchJson, HttpError, type FeatureCollection } from "./base";
 import { buildCard, closeDetails, showDetails } from "../ui/details";
@@ -177,6 +178,11 @@ export class AircraftLayer extends DataLayer {
 
   attach(map: MlMap): void {
     super.attach(map);
+    onRelayChange(() => {
+      this.backoffUntil = {};
+      this.backoffWhy = {};
+      this.refreshSoon(0);
+    });
     map.on("moveend", () => {
       if (FEED_MODE === "fixtures" || this.queryKey() === this.lastQuery) return;
       this.refreshSoon(Math.max(700, this.lastStart + MIN_GAP_MS - Date.now()));
@@ -239,23 +245,38 @@ export class AircraftLayer extends DataLayer {
 
   /** Per source: until when to send nothing after it said "too many requests" (HTTP 429). */
   private backoffUntil: Partial<Record<FeedId, number>> = {};
+  private backoffWhy: Partial<Record<FeedId, string>> = {};
 
   /** GET one relayed feed path, with errors that say who answered. */
   private async get(path: string, signal: AbortSignal): Promise<AdsbRecord[]> {
-    const url = FEED_MODE === "fixtures" ? fixtureUrl("aircraft-adsblol.json") : new URL(`proxy/${path}`, document.baseURI).href;
+    const url = FEED_MODE === "fixtures" ? fixtureUrl("aircraft-adsblol.json") : `${relayUrl()}/air/${path}`;
     try {
       const data = await fetchJson<AdsbResponse>(url, signal);
       return data.ac ?? data.aircraft ?? [];
     } catch (err) {
-      if (!(err instanceof HttpError) || FEED_MODE === "fixtures") throw err;
-      // Three different answerers: no relay at all, our relay, or the feed itself.
-      if (err.via === "relay") throw new Error(`local relay: ${err.message}`);
-      if (err.via === "") throw new Error(`no relay here (${err.message.slice(0, 20)}): (re)start the app with npm run dev`);
+      if (FEED_MODE === "fixtures" || signal.aborted) throw err;
+      // Network failure: nothing answered at the relay address.
+      if (err instanceof TypeError) throw new Error(`relay not reachable at ${relayUrl()} (choose another under "Relay:")`);
+      if (!(err instanceof HttpError)) throw err;
+      // Three different answerers: something that isn't our relay, our relay, or the feed itself.
+      if (err.via === "relay") throw new Error(`relay: ${err.message}`);
+      if (err.via === "") throw new Error(`no rabbithole relay at ${relayUrl()} (HTTP ${err.status})`);
+      // Feeds limit or block by internet address. A shared relay (e.g. on Cloudflare, whose servers
+      // share addresses with many other sites) is often refused; one on your own connection is not.
+      const name = FEEDS[this.feed].name;
+      const own = relayUrl() === LOCAL_RELAY ? "" : ". Aircraft need a relay on your own connection: npm run selfhost, then Relay → This computer";
       if (err.status === 429) {
         this.backoffUntil[this.feed] = Date.now() + 30000;
-        throw new Error(`${FEEDS[this.feed].name} asks us to slow down (429): pausing 30 s`);
+        this.backoffWhy[this.feed] = `${name} is rate-limiting this relay (429)${own}`;
+        throw new Error(this.backoffWhy[this.feed]);
       }
-      throw new Error(`${FEEDS[this.feed].name} answered ${err.message}`);
+      if (err.status === 403 && /cloudflare|attention required/i.test(err.body)) {
+        this.backoffUntil[this.feed] = Date.now() + 5 * 60000; // a block doesn't lift in seconds
+        this.backoffWhy[this.feed] = `${name} blocks requests from this relay's servers (403)${own}`;
+        throw new Error(this.backoffWhy[this.feed]);
+      }
+      // Never show an HTML error page as text.
+      throw new Error(`${name} answered HTTP ${err.status}${err.body && !err.body.startsWith("<") ? `: ${err.body}` : ""}`);
     }
   }
 
@@ -264,7 +285,7 @@ export class AircraftLayer extends DataLayer {
     this.lastQuery = this.queryKey();
     const live = FEED_MODE === "live";
     const wait = (this.backoffUntil[this.feed] ?? 0) - Date.now();
-    if (live && wait > 0) throw new Error(`${FEEDS[this.feed].name} asked us to slow down: next try in ${Math.ceil(wait / 1000)} s`);
+    if (live && wait > 0) throw new Error(`${this.backoffWhy[this.feed] ?? `${FEEDS[this.feed].name} asked us to slow down`} · next try in ${Math.ceil(wait / 1000)} s`);
     let records: AdsbRecord[] = [];
     if (!this.tooFar) {
       this.lastStart = Date.now();
@@ -416,7 +437,7 @@ export class AircraftLayer extends DataLayer {
     const ctrl = new AbortController();
     this.pathCtrl = ctrl;
     this.path = { hex, state: "loading", coords: [], endT: 0 };
-    const url = new URL(`proxy/adsbloltrace/${hex.slice(-2)}/trace_full_${hex}.json`, document.baseURI).href;
+    const url = `${relayUrl()}/air/adsbloltrace/${hex.slice(-2)}/trace_full_${hex}.json`;
     fetchJson<TraceFile>(url, ctrl.signal)
       .then((file) => parseTrace(hex, file), () => (ctrl.signal.aborted ? undefined : ({ hex, state: "none", coords: [], endT: 0 } as FlightPath)))
       .then((path) => {

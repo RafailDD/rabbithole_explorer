@@ -1,6 +1,6 @@
 import { Popup, type Map as MlMap, type MapLayerMouseEvent } from "maplibre-gl";
 import { FEED_MODE, fixtureUrl } from "../config";
-import { relayUrl, setRelayUrl } from "../relay";
+import { onRelayChange, relayUrl } from "../relay";
 import { buildCard, closeDetails, showDetails } from "../ui/details";
 import { DataLayer, EMPTY, fetchJson, type FeatureCollection } from "./base";
 
@@ -27,7 +27,7 @@ interface Ship {
   t: number; // when we last got a position (ms, local clock)
 }
 
-const MAX_SPAN_DEG = 20; // same limit as the relay
+const DEFAULT_MAX_SPAN_DEG = 20; // until the relay says its own limit ("hello")
 const MIN_SPAN_DEG = 1; // smallest area asked from the relay
 const STALE_MS = 30 * 60 * 1000;
 
@@ -85,6 +85,7 @@ export class ShipsLayer extends DataLayer {
   protected readonly pollMs = 0; // live push over a WebSocket, not polling
 
   private relay = relayUrl();
+  private maxSpan = DEFAULT_MAX_SPAN_DEG;
   private ws: WebSocket | undefined;
   private retry: number | undefined;
   private ships = new Map<number, Ship>();
@@ -99,6 +100,11 @@ export class ShipsLayer extends DataLayer {
 
   attach(map: MlMap): void {
     super.attach(map);
+    onRelayChange(() => {
+      this.closeSocket();
+      this.ships.clear();
+      if (this.isEnabled && FEED_MODE === "live") this.openSocket();
+    });
     map.on("moveend", () => this.sendBox());
   }
 
@@ -119,7 +125,7 @@ export class ShipsLayer extends DataLayer {
     if (this.isEnabled && FEED_MODE === "live") this.openSocket();
   }
 
-  renderSettings(changed: () => void): HTMLElement | null {
+  renderSettings(): HTMLElement | null {
     const wrap = document.createElement("div");
     wrap.className = "setting";
     const legend = document.createElement("div");
@@ -130,26 +136,7 @@ export class ShipsLayer extends DataLayer {
       dot.style.background = color;
       legend.append(dot, ` ${text} `);
     }
-    if (FEED_MODE === "fixtures") {
-      wrap.append("relay: saved sample", legend);
-      return wrap;
-    }
-    const input = document.createElement("input");
-    input.type = "url";
-    input.className = "url";
-    input.id = "relay-url";
-    input.value = this.relay;
-    input.title = "Address of your rabbithole relay (Cloudflare Worker), e.g. https://rabbithole-relay.<you>.workers.dev";
-    const apply = () => {
-      if (input.value.trim().replace(/\/+$/, "") === this.relay || !setRelayUrl(input.value)) return;
-      this.relay = relayUrl();
-      this.closeSocket();
-      if (this.isEnabled) this.openSocket();
-      changed();
-    };
-    input.addEventListener("change", apply);
-    input.addEventListener("keydown", (e) => e.key === "Enter" && apply());
-    wrap.append("relay: ", input, legend);
+    wrap.append(FEED_MODE === "fixtures" ? "saved sample · " : "via the relay chosen above · ", legend);
     return wrap;
   }
 
@@ -173,7 +160,7 @@ export class ShipsLayer extends DataLayer {
 
   private openSocket(): void {
     if (this.ws || !this.isEnabled) return;
-    this.relay = relayUrl(); // may have been changed in the Webcams options
+    this.relay = relayUrl();
     window.clearTimeout(this.retry);
     const url = `${this.relay.replace(/^http/, "ws")}/ships`;
     let ws: WebSocket;
@@ -222,8 +209,8 @@ export class ShipsLayer extends DataLayer {
     const [w, e] = pad(b.getWest(), b.getEast());
     const [s, n] = pad(b.getSouth(), b.getNorth());
     const box: [number, number, number, number] = [Math.max(-180, w), Math.max(-90, s), Math.min(180, e), Math.min(90, n)];
-    if (box[2] - box[0] > MAX_SPAN_DEG || box[3] - box[1] > MAX_SPAN_DEG) {
-      this.note = "zoom in to see ships (view up to 20° wide)";
+    if (box[2] - box[0] > this.maxSpan || box[3] - box[1] > this.maxSpan) {
+      this.note = `zoom in to see ships (view up to ${this.maxSpan}° wide)`;
       this.status(this.note);
       this.box = undefined;
       return;
@@ -235,10 +222,15 @@ export class ShipsLayer extends DataLayer {
   }
 
   private onMessage(text: string): void {
-    let m: { t: string; full?: boolean; ships?: Row[]; msg?: string; upstream?: string };
+    let m: { t: string; full?: boolean; ships?: Row[]; msg?: string; upstream?: string; maxSpan?: number };
     try {
       m = JSON.parse(text);
     } catch {
+      return;
+    }
+    if (m.t === "hello") {
+      this.maxSpan = m.maxSpan ?? DEFAULT_MAX_SPAN_DEG;
+      this.sendBox(true); // the first box may have been judged with the default limit
       return;
     }
     if (m.t === "status") {

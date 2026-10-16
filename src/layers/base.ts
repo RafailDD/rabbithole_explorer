@@ -200,7 +200,7 @@ export class HttpError extends Error {
     readonly status: number,
     readonly body: string,
     /**
-     * Who answered, from headers set by the dev relay (tools/feed-proxy.ts):
+     * Who answered, from the x-rhe-relay header set by our relay (worker/):
      * "relay" = the relay itself failed, "feed" = relayed from the feed, "" = no relay involved.
      */
     readonly via: "relay" | "feed" | "",

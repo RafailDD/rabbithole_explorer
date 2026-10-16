@@ -1,7 +1,9 @@
-# Cloudflare Worker: relays AISStream (ships) to the browser. The AISStream key is a secret:
-#   npx wrangler secret put AISSTREAM_KEY      (deployed Worker)
-#   worker/.dev.vars: AISSTREAM_KEY=...         (local `npm run dev`, git-ignored)
-#   Same for WINDY_KEY (Windy Webcams API, free plan) for /webcams/tile/z/x/y.
+# rabbithole relay (Cloudflare Worker): aircraft feeds (no CORS), ships (AISStream) and
+# webcams (Windy) for the page. Keys are secrets, never in git:
+#   hosted:       npx wrangler secret put AISSTREAM_KEY   /   npx wrangler secret put WINDY_KEY
+#   self-hosted:  worker/.dev.vars (written by `npm run setup`), used by `npm run selfhost`
+# Values in worker/.dev.vars also override the [vars] below when running locally, e.g.
+#   SHIPS_MAX_SPAN_DEG=40  (bigger ship views for your own relay)   WEBCAM_CACHE_S=300
 name = "rabbithole-relay"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
@@ -9,6 +11,8 @@ compatibility_date = "2026-09-01"
 [vars]
 # Pages allowed to use this relay (comma-separated). Add the GitHub Pages address at step 8.
 ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173"
+SHIPS_MAX_SPAN_DEG = "20"
+WEBCAM_CACHE_S = "600"
 
 [[durable_objects.bindings]]
 name = "SHIPS"

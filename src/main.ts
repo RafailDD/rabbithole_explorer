@@ -10,10 +10,11 @@ import { WebcamsLayer } from "./layers/webcams";
 import { ShipsLayer } from "./layers/ships";
 import { LayerRegistry } from "./layers/registry";
 import { BASEMAPS, buildStyle, isDarkBasemap } from "./basemaps";
-import { BASEMAP_ENABLED } from "./config";
+import { BASEMAP_ENABLED, FEED_MODE } from "./config";
 import { addIcons, createMap } from "./map";
 import { initialBasemap, initialLayerIds, saveLayerIds } from "./state";
 import { buildBasemapPicker } from "./ui/basemap-picker";
+import { buildRelayPicker } from "./ui/relay-picker";
 import { buildSearch } from "./ui/search";
 import { buildAbout, buildPanel, updateCredits } from "./ui/panel";
 
@@ -49,6 +50,8 @@ map.on("load", () => {
   const layersList = panel.querySelector(".layers")!;
   layersList.before(buildSearch(map));
   if (BASEMAP_ENABLED) layersList.before(buildBasemapPicker(map, basemapId, () => updateCredits(credits, registry, openAbout)));
+  // Which relay serves aircraft, ships and webcams (hosted, this computer, or custom).
+  if (FEED_MODE === "live") layersList.before(buildRelayPicker());
 
   const sync = () => {
     saveLayerIds(registry.enabledIds());
