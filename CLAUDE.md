@@ -179,7 +179,7 @@ History before the public repo (PR numbers, dates) is in the private notes repo.
 | 6b | Basemaps: light / colour / dark / black & white / satellite (EOX, MapTiler, NASA) | **Done** |
 | 7 | LoRa gateways: snapshot script + clustered circles | **Done** |
 | 7b | UI fixes (14 Oct): follow selected plane, demo removed, collapsible panel, search bar, road names on imagery, Colour default, clearer dev switch | **Done** |
-| 8 | Go public: README + screenshots, licences, Pages Action, snapshot Actions, Lighthouse. **Ask before going public.** | 8a **done** in sandbox, PR #1 (`milestone: v0.8a relay + self-host`) (aircraft through the relay, self-host mode, relay picker, wrangler 4.151.1 = 0 audit issues). Next: 8b README (no webcam pictures in screenshots), Actions, Lighthouse. **Ask before making anything public.** |
+| 8 | Go public: README + screenshots, licences, Pages Action, snapshot Actions, Lighthouse. **Ask before going public.** | 8a **done** in sandbox, PR #1 (`milestone: v0.8a relay + self-host`) (aircraft through the relay, self-host mode, relay picker, wrangler 4.151.1 = 0 audit issues). 8b **done** in sandbox: README (what it is, layers, privacy, how it works, three ways to run, keys, development, credits) + 4 screenshots in `docs/screenshots/` (aircraft London, quakes Pacific, satellites + night, LoRa Europe; no webcams, no home location). Next: 8c Actions (Pages, LoRa snapshot), 8d Lighthouse + final check. **Ask before making anything public.** |
 
 ## Ideas backlog ("anything relating to a map is a candidate overlay")
 
