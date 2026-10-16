@@ -558,7 +558,13 @@ async function expand(page, id) {
       .waitForFunction(
         ([layer, pred]) => {
           const m = window.__rhe.map;
-          const f = m.queryRenderedFeatures({ layers: [layer] }).find((x) => new Function("p", `return ${pred}`)(x.properties));
+          // Only features whose spot is really the map (not under the panel or the details card).
+          const canvas = m.getCanvas();
+          const f = m.queryRenderedFeatures({ layers: [layer] }).find((x) => {
+            if (!new Function("p", `return ${pred}`)(x.properties)) return false;
+            const pt = m.project(x.geometry.coordinates);
+            return document.elementFromPoint(pt.x, pt.y) === canvas;
+          });
           return f ? m.project(f.geometry.coordinates) : false;
         },
         [layer, pred],
@@ -641,6 +647,34 @@ async function expand(page, id) {
       check(/\d+ aircraft · adsb\.lol/.test(await rp.page.textContent('[data-status="air"]')), `relay picker: switching back reloads aircraft (${await rp.page.textContent('[data-status="air"]')})`);
     }
     await rp.ctx.close();
+  }
+
+  // 8j. A shared relay refused by the feeds (seen on Cloudflare: adsb.fi 403 "Attention Required",
+  // adsb.lol 429): readable messages pointing to self-hosting, never raw HTML. Simulated relay.
+  {
+    const fake = await openPage(browser, "&feeds=live&layers=air", "#7/43.6/7.2");
+    let answer = 403;
+    await fake.page.route("http://relay.test/**", (route) => {
+      const cors = { "access-control-allow-origin": "*", "access-control-expose-headers": "x-rhe-relay" };
+      if (route.request().url().endsWith("/health")) return route.fulfill({ status: 200, body: "ok", headers: cors });
+      const body = answer === 403 ? "<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head></html>" : "<html><head><title>429 Too Many Requests</title></head></html>";
+      return route.fulfill({ status: answer, body, headers: { ...cors, "x-rhe-relay": "feed", "content-type": "text/html" } });
+    });
+    await fake.page.selectOption("#relay-select", "custom");
+    await fake.page.fill("#relay-url", "http://relay.test");
+    await fake.page.press("#relay-url", "Enter");
+    await fake.page.waitForFunction(() => /blocks requests/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 10000 }).catch(() => {});
+    const t403 = await fake.page.textContent('[data-status="air"]');
+    check(/blocks requests from this relay's servers \(403\)/.test(t403) && /npm run selfhost/.test(t403) && !/<|DOCTYPE/.test(t403), `blocked relay explained (${t403.slice(0, 90)}…)`);
+    answer = 429;
+    await fake.page.selectOption("#relay-select", "local"); // relay change clears the pause
+    await fake.page.selectOption("#relay-select", "custom");
+    await fake.page.fill("#relay-url", "http://relay.test");
+    await fake.page.press("#relay-url", "Enter");
+    await fake.page.waitForFunction(() => /rate-limiting this relay/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 10000 }).catch(() => {});
+    const t429 = await fake.page.textContent('[data-status="air"]');
+    check(/rate-limiting this relay \(429\)/.test(t429) && /npm run selfhost/.test(t429), `rate-limited relay explained (${t429.slice(0, 90)}…)`);
+    await fake.ctx.close();
   }
 
   // 8e. Background maps (needs internet): switching keeps the data layers and their data.
@@ -801,7 +835,7 @@ async function expand(page, id) {
       console.log("SKIP  live: no fast aircraft in view to test card following");
     }
     // If the feed rate-limited this test's burst, the app pauses 30 s: wait that out first.
-    await l.page.waitForFunction(() => !/slow down/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 45000 }).catch(() => {});
+    await l.page.waitForFunction(() => !/slow down|rate-limiting/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 45000 }).catch(() => {});
     await sleep(2500);
     const beforePan = l.proxy.n;
     await l.page.evaluate(() => window.__rhe.map.panBy([300, 0], { duration: 0 }));
