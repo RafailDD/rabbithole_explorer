@@ -1,0 +1,19 @@
+# Cloudflare Worker: relays AISStream (ships) to the browser. The AISStream key is a secret:
+#   npx wrangler secret put AISSTREAM_KEY      (deployed Worker)
+#   worker/.dev.vars: AISSTREAM_KEY=...         (local `npm run dev`, git-ignored)
+#   Same for WINDY_KEY (Windy Webcams API, free plan) for /webcams/tile/z/x/y.
+name = "rabbithole-relay"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Pages allowed to use this relay (comma-separated). Add the GitHub Pages address at step 8.
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173"
+
+[[durable_objects.bindings]]
+name = "SHIPS"
+class_name = "ShipsRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShipsRelay"]

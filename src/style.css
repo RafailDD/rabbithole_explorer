@@ -1,0 +1,344 @@
+/* Kept cheap for integrated graphics: no blur, no backdrop-filter, no animations. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font: 14px/1.4 system-ui, sans-serif;
+  color: #1d2329;
+  background: #e9edf0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+#panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 230px;
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #c9d1d8;
+  border-radius: 4px;
+}
+
+#panel h1 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-body {
+  margin-top: 8px;
+}
+
+.panel-body[hidden],
+.setting[hidden] {
+  display: none;
+}
+
+button.fold,
+button.expand {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+  color: #5b6670;
+  cursor: pointer;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+}
+
+.search .search-results {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.search .search-results li {
+  margin: 3px 0;
+}
+
+.search .status {
+  flex-basis: 100%;
+}
+
+.basemap {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ea;
+}
+
+.basemap .setting a {
+  font-size: 12px;
+}
+
+.layers {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.layers li {
+  margin-bottom: 6px;
+}
+
+.status {
+  margin-left: 22px;
+  font-size: 12px;
+  color: #5b6670;
+}
+
+.status.error {
+  color: #b3261e;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0 5px;
+  font-size: 11px;
+  border-radius: 3px;
+  background: #e4e7ea;
+  color: #444;
+}
+
+.badge.on {
+  background: #d5ecd5;
+  color: #1d5e1d;
+}
+
+h1 .badge {
+  background: #ffe7a8;
+  color: #6b4b00;
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1f4e8c;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.dev {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #c9d1d8;
+  font-size: 12px;
+  color: #5b6670;
+}
+
+#credits {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  max-width: calc(100% - 360px);
+  padding: 2px 6px;
+  font-size: 12px;
+  background: #ffffff;
+  border: 1px solid #c9d1d8;
+  border-radius: 3px;
+}
+
+#about {
+  max-width: 560px;
+  border: 1px solid #c9d1d8;
+  border-radius: 4px;
+}
+
+#about dt {
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+#about dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+/* Docked details of the selected item: right side, clear of the zoom buttons. */
+#details {
+  position: absolute;
+  top: 10px;
+  right: 50px;
+  width: 260px;
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #c9d1d8;
+  border-radius: 4px;
+}
+
+/* Wider while it shows a webcam picture or video. */
+#details:has(.media-card) {
+  width: 360px;
+}
+
+.card .media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 6px 0 2px;
+  border: 0;
+  background: #1d2329;
+}
+
+.card img.media {
+  height: auto;
+  aspect-ratio: auto;
+}
+
+.card .links {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.card .small {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #5b6670;
+}
+
+#details[hidden] {
+  display: none;
+}
+
+#details .close {
+  float: right;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #5b6670;
+}
+
+.hover-tip .maplibregl-popup-content {
+  padding: 2px 6px;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.hover-tip .maplibregl-popup-tip {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  /* Phones: details become a bottom sheet. */
+  #details {
+    top: auto;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+    max-height: 40%;
+  }
+  #panel {
+    width: auto;
+    right: 60px;
+  }
+  #credits {
+    max-width: calc(100% - 40px);
+    bottom: 40px;
+  }
+}
+
+.setting {
+  margin: 2px 0 0 22px;
+  font-size: 12px;
+  color: #5b6670;
+}
+
+.setting label.group {
+  display: inline-block;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+.setting label.group .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+
+.legend {
+  margin-top: 2px;
+}
+
+.legend .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+
+.legend .dot.ring {
+  background: transparent;
+  border: 2px solid #2b8a3e;
+  width: 7px;
+  height: 7px;
+}
+
+.legend .dot.mine {
+  background: #c2255c;
+}
+
+input.url {
+  width: 100%;
+  box-sizing: border-box;
+  font: 12px monospace;
+}
+
+.card dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 8px;
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.card dt {
+  color: #5b6670;
+}
+
+.card dd {
+  margin: 0;
+}

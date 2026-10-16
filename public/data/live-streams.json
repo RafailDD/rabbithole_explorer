@@ -1,0 +1,226 @@
+{
+  "about": "Hand-picked public live webcams on YouTube (fixed scenic, port, airport, nature cameras; no security/CCTV cameras). Positions are approximate. embed=false: the owner disallows embedding: the card links to YouTube instead. Checked with `npm run streams` (tools/check-streams.mjs).",
+  "checked": "2026-10-15",
+  "streams": [
+    {
+      "video": "Hsn5yv_eT3I",
+      "embed": false,
+      "title": "Saint-Mandrier: port and Toulon harbour",
+      "place": "Saint-Mandrier-sur-Mer, France",
+      "lat": 43.078,
+      "lon": 5.928,
+      "channel": "Webcams Ports France",
+      "kind": "port"
+    },
+    {
+      "video": "u89M4sHi0jA",
+      "embed": false,
+      "title": "Ajaccio: commercial port",
+      "place": "Ajaccio, Corsica, France",
+      "lat": 41.922,
+      "lon": 8.742,
+      "channel": "Les webcams en direct de Corse",
+      "kind": "port"
+    },
+    {
+      "video": "L7CwUQzJ7pg",
+      "embed": false,
+      "title": "Bonifacio: port",
+      "place": "Bonifacio, Corsica, France",
+      "lat": 41.388,
+      "lon": 9.161,
+      "channel": "Les webcams en direct de Corse",
+      "kind": "port"
+    },
+    {
+      "video": "7jwFYnBjDFY",
+      "embed": false,
+      "title": "Le Tréport aerodrome",
+      "place": "Le Tréport, France",
+      "lat": 50.067,
+      "lon": 1.427,
+      "channel": "Les Webcams du Nord de la France",
+      "kind": "airport"
+    },
+    {
+      "video": "60NPAd7SJxc",
+      "title": "Val d'Isère village and slopes",
+      "place": "Val d'Isère, France",
+      "lat": 45.448,
+      "lon": 6.98,
+      "channel": "Val d'Isère Online",
+      "kind": "mountain"
+    },
+    {
+      "video": "VAS9A0LRGHA",
+      "title": "Munich: Marienplatz",
+      "place": "Munich, Germany",
+      "lat": 48.137,
+      "lon": 11.575,
+      "channel": "LUDWIG BECK",
+      "kind": "city"
+    },
+    {
+      "video": "uDBYuEV4zjI",
+      "title": "London Heathrow airport",
+      "place": "London, UK",
+      "lat": 51.47,
+      "lon": -0.454,
+      "channel": "BIG JET TV",
+      "kind": "airport"
+    },
+    {
+      "video": "tYgGEC-ESTw",
+      "title": "Reykjavik skyline",
+      "place": "Reykjavik, Iceland",
+      "lat": 64.146,
+      "lon": -21.94,
+      "channel": "Our World Live",
+      "kind": "city"
+    },
+    {
+      "video": "SuOXfvH34nU",
+      "title": "Reykjanes volcano watch (cam A)",
+      "place": "Reykjanes Peninsula, Iceland",
+      "lat": 63.88,
+      "lon": -22.45,
+      "channel": "afarTV",
+      "kind": "volcano"
+    },
+    {
+      "video": "0GWhDmC6UYU",
+      "title": "Maasai Mara wildlife cameras",
+      "place": "Maasai Mara, Kenya",
+      "lat": -1.5,
+      "lon": 35.15,
+      "channel": "SBC-TV",
+      "kind": "nature"
+    },
+    {
+      "video": "QQ82q7huU3g",
+      "title": "Yokohama port, Bay Bridge",
+      "place": "Yokohama, Japan",
+      "lat": 35.455,
+      "lon": 139.64,
+      "channel": "横浜港ライブカメラ",
+      "kind": "port"
+    },
+    {
+      "video": "PcQuKzfsTio",
+      "title": "Kurushima Strait ships (with AIS names)",
+      "place": "Imabari, Japan",
+      "lat": 34.12,
+      "lon": 133,
+      "channel": "SKHN",
+      "kind": "port"
+    },
+    {
+      "video": "RgZuZ9HSQ_M",
+      "title": "Akita port weather camera",
+      "place": "Akita, Japan",
+      "lat": 39.75,
+      "lon": 140.07,
+      "channel": "ABS Akita Broadcasting",
+      "kind": "port"
+    },
+    {
+      "video": "r06QHbh05qM",
+      "title": "Homigot sunrise square",
+      "place": "Pohang, South Korea",
+      "lat": 36.077,
+      "lon": 129.567,
+      "channel": "GiGAeyes Live TV",
+      "kind": "coast"
+    },
+    {
+      "video": "Z7hAgOjTlbo",
+      "title": "Singapore port (Tanjong Pagar)",
+      "place": "Singapore",
+      "lat": 1.264,
+      "lon": 103.84,
+      "channel": "Christoph Burgdorfer",
+      "kind": "port"
+    },
+    {
+      "video": "H3W5vZbp0Yc",
+      "title": "Adelaide airport, runway 23",
+      "place": "Adelaide, Australia",
+      "lat": -34.945,
+      "lon": 138.531,
+      "channel": "Adelaide Airport Limited",
+      "kind": "airport"
+    },
+    {
+      "video": "eCHeZDEVSeU",
+      "title": "Honolulu harbour",
+      "place": "Honolulu, Hawaii, USA",
+      "lat": 21.307,
+      "lon": -157.866,
+      "channel": "The Bridge Guy",
+      "kind": "port"
+    },
+    {
+      "video": "ygQ1iv8iZr8",
+      "title": "Kīlauea volcano (USGS cameras)",
+      "place": "Hawaii Volcanoes National Park, USA",
+      "lat": 19.41,
+      "lon": -155.28,
+      "channel": "Lava Watchers",
+      "kind": "volcano"
+    },
+    {
+      "video": "bJ3iYpvbC5Y",
+      "title": "Pacifica pier and beach",
+      "place": "Pacifica, California, USA",
+      "lat": 37.633,
+      "lon": -122.495,
+      "channel": "Chamberlin Nature",
+      "kind": "coast"
+    },
+    {
+      "video": "iZRbml7fnXI",
+      "title": "New Orleans airport (MSY)",
+      "place": "New Orleans, USA",
+      "lat": 29.993,
+      "lon": -90.258,
+      "channel": "Flightradar24",
+      "kind": "airport"
+    },
+    {
+      "video": "goeCBDBJZ1E",
+      "title": "Galveston ship channel",
+      "place": "Galveston, Texas, USA",
+      "lat": 29.31,
+      "lon": -94.79,
+      "channel": "Galveston TV",
+      "kind": "port"
+    },
+    {
+      "video": "XTNRGKHiZNg",
+      "title": "Cape Canaveral launch pads",
+      "place": "Kennedy Space Center, Florida, USA",
+      "lat": 28.49,
+      "lon": -80.58,
+      "channel": "Avid Space",
+      "kind": "space"
+    },
+    {
+      "video": "GkBMgHwSIV0",
+      "title": "Miami skyline, MacArthur Causeway",
+      "place": "Miami, Florida, USA",
+      "lat": 25.78,
+      "lon": -80.17,
+      "channel": "Ozolio Live",
+      "kind": "city"
+    },
+    {
+      "video": "T_QsY01tIK0",
+      "title": "New York LaGuardia airport",
+      "place": "New York, USA",
+      "lat": 40.777,
+      "lon": -73.872,
+      "channel": "Flightradar24",
+      "kind": "airport"
+    }
+  ]
+}

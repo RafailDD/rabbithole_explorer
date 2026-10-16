@@ -1,0 +1,8 @@
+{
+  "about": "Made-up webcams for fixtures mode (no Windy data is stored in this repo: their terms forbid redistribution).",
+  "cams": [
+    [900001, 7.128, 43.585, 1, "Sample: harbour view", "French Riviera (sample)", 1, "2026-10-15T20:00:00.000Z", "", 0, 0, "", "", ""],
+    [900002, 7.02, 43.55, 1, "Sample: beach", "Cannes (sample), France", 0, "2026-10-14T12:00:00.000Z", "", 0, 0, "", "", ""],
+    [900003, 7.26, 43.70, 12, "Sample: city", "Nice (sample), France", 1, "2026-10-15T20:00:00.000Z", "", 0, 0, "", "", ""]
+  ]
+}

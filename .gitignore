@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.log
+.env
+.env.*
+.DS_Store
+# Local decoder recordings may contain what my own antenna heard: keep them out of git.
+*.local.json
+# Smoke-test screenshots
+smoke.png

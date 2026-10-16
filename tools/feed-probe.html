@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feed probe</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; color: #222; background: #fff; }
+  table { border-collapse: collapse; margin-top: 12px; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; vertical-align: top; }
+  th { background: #f2f2f2; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { background: #e3f6e3; }
+  .bad { background: #fbe3e3; }
+  .warn { background: #fff4d6; }
+  code, pre { font-size: 12px; }
+  pre { background: #f6f6f6; padding: 8px; white-space: pre-wrap; }
+  button { font-size: 14px; padding: 4px 12px; margin-right: 8px; }
+  .muted { color: #666; }
+</style>
+</head>
+<body>
+<h1>rabbithole_explorer — feed probe (step 0)</h1>
+<p>Calls each public feed once from <b>this</b> browser and reports whether the browser may read the response (CORS).
+Point queries are centred on Nice (43.70 N, 7.27 E), radius 50 nm / 50 km.</p>
+<p class="muted">Each feed is requested once per click, one at a time, 1.2 s apart (adsb.fi and airplanes.live allow 1 request/s).
+CelesTrak asks for one download per 2 hours per data set, so this page skips it if it ran less than 2 hours ago.</p>
+<button id="run">Run probe</button>
+<button id="copy" disabled>Copy results as Markdown</button>
+<span id="msg" class="muted"></span>
+<table id="out">
+  <thead><tr><th>Feed</th><th>Result</th><th>HTTP</th><th>CORS</th><th>Size</th><th>Time</th><th>Content-Type</th><th>Notes</th></tr></thead>
+  <tbody></tbody>
+</table>
+<pre id="md" hidden></pre>
+<script>
+"use strict";
+const LAT = 43.7, LON = 7.27;
+
+// One entry per feed. `once2h` marks feeds with a strict download policy.
+const FEEDS = [
+  { name: "adsb.lol", url: `https://api.adsb.lol/v2/lat/${LAT}/lon/${LON}/dist/50` },
+  { name: "adsb.fi", url: `https://opendata.adsb.fi/api/v3/lat/${LAT}/lon/${LON}/dist/50` },
+  { name: "airplanes.live", url: `https://api.airplanes.live/v2/point/${LAT}/${LON}/50` },
+  { name: "USGS (2.5+ day)", url: "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson" },
+  { name: "EMSC FDSN", url: "https://www.seismicportal.eu/fdsnws/event/1/query?limit=20&format=json" },
+  { name: "CelesTrak (stations)", url: "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json", once2h: true },
+  { name: "Packet Broker (TTN, 50 km)", url: `https://mapper.packetbroker.net/api/v2/gateways?netID=000013&distanceWithin%5Blatitude%5D=${LAT}&distanceWithin%5Blongitude%5D=${LON}&distanceWithin%5Bdistance%5D=50000` },
+  { name: "OpenFreeMap style", url: "https://tiles.openfreemap.org/styles/positron" },
+  { name: "RainViewer index", url: "https://api.rainviewer.com/public/weather-maps.json" },
+];
+
+const tbody = document.querySelector("#out tbody");
+const msg = document.getElementById("msg");
+const results = [];
+
+function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { /* storage blocked: ignore */ } }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fmtSize = (n) => n == null ? "" : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} kB` : `${(n / 1048576).toFixed(2)} MB`;
+
+async function probe(feed) {
+  const r = { name: feed.name, url: feed.url, result: "", status: "", cors: "", size: null, ms: null, type: "", notes: "" };
+  if (feed.once2h) {
+    const last = Number(lsGet("probe.celestrak.last") || 0);
+    if (Date.now() - last < 2 * 3600 * 1000) {
+      r.result = "skipped";
+      r.notes = `ran ${Math.round((Date.now() - last) / 60000)} min ago; CelesTrak policy is 1 download / 2 h`;
+      return r;
+    }
+    lsSet("probe.celestrak.last", String(Date.now()));
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const t0 = performance.now();
+  try {
+    // Normal (CORS) request: succeeds only if the server sends Access-Control-Allow-Origin.
+    const res = await fetch(feed.url, { mode: "cors", cache: "no-store", signal: ctrl.signal });
+    const buf = await res.arrayBuffer();
+    r.ms = Math.round(performance.now() - t0);
+    r.status = String(res.status);
+    r.cors = "yes";
+    r.size = buf.byteLength;
+    r.type = res.headers.get("content-type") || "";
+    r.result = res.ok ? "OK" : "HTTP error";
+    if (res.ok && /json/.test(r.type)) {
+      try { r.notes = describe(JSON.parse(new TextDecoder().decode(buf))); } catch { r.notes = "body is not valid JSON"; }
+    }
+  } catch (e) {
+    r.ms = Math.round(performance.now() - t0);
+    if (e.name === "AbortError") { r.result = "timeout (20 s)"; clearTimeout(timer); return r; }
+    // The CORS request failed. Retry in "no-cors" mode: the browser then fetches the
+    // response but hides it from the page. If that works, the server is reachable and
+    // the failure was CORS; if it also fails, it's a network/DNS/TLS problem.
+    try {
+      await fetch(feed.url, { mode: "no-cors", cache: "no-store", signal: ctrl.signal });
+      r.result = "blocked by CORS";
+      r.cors = "no";
+      r.notes = "server reachable, but sends no Access-Control-Allow-Origin for this page";
+    } catch (e2) {
+      r.result = "network error";
+      r.cors = "?";
+      r.notes = String(e2.message || e2);
+    }
+  }
+  clearTimeout(timer);
+  return r;
+}
+
+// Short summary of what came back, to spot empty or unexpected responses.
+function describe(j) {
+  if (Array.isArray(j)) return `JSON array, ${j.length} items`;
+  if (j && Array.isArray(j.ac)) return `${j.ac.length} aircraft`;
+  if (j && Array.isArray(j.aircraft)) return `${j.aircraft.length} aircraft`;
+  if (j && Array.isArray(j.features)) return `${j.features.length} features`;
+  if (j && j.radar) return `radar frames: ${(j.radar.past || []).length}`;
+  if (j && j.sources) return `map style, ${Object.keys(j.sources).length} source(s)`;
+  return `JSON object, keys: ${Object.keys(j || {}).slice(0, 6).join(", ")}`;
+}
+
+function render() {
+  tbody.innerHTML = "";
+  for (const r of results) {
+    const tr = document.createElement("tr");
+    tr.className = r.result === "OK" ? "ok" : r.result === "skipped" ? "warn" : "bad";
+    const cells = [r.name, r.result, r.status, r.cors, fmtSize(r.size), r.ms == null ? "" : `${r.ms} ms`, r.type, r.notes];
+    cells.forEach((c, i) => {
+      const td = document.createElement("td");
+      if (i === 0) { const a = document.createElement("a"); a.href = r.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = c; td.appendChild(a); }
+      else td.textContent = c;
+      if (i === 4 || i === 5) td.className = "num";
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+function markdown() {
+  const head = "| Feed | Result | HTTP | CORS | Size | Time | Notes |\n| --- | --- | --- | --- | --- | --- | --- |\n";
+  const rows = results.map((r) => `| ${r.name} | ${r.result} | ${r.status} | ${r.cors} | ${fmtSize(r.size)} | ${r.ms ?? ""} ms | ${r.notes} |`).join("\n");
+  return `Feed probe, ${new Date().toISOString()}, origin ${location.origin}, ${navigator.userAgent}\n\n${head}${rows}\n`;
+}
+
+document.getElementById("run").addEventListener("click", async (ev) => {
+  ev.target.disabled = true;
+  document.getElementById("copy").disabled = true;
+  results.length = 0;
+  for (let i = 0; i < FEEDS.length; i++) {
+    msg.textContent = `probing ${FEEDS[i].name} (${i + 1}/${FEEDS.length})…`;
+    results.push(await probe(FEEDS[i]));
+    render();
+    if (i < FEEDS.length - 1) await sleep(1200);
+  }
+  msg.textContent = "done.";
+  const md = document.getElementById("md");
+  md.textContent = markdown();
+  md.hidden = false;
+  ev.target.disabled = false;
+  document.getElementById("copy").disabled = false;
+});
+
+document.getElementById("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(markdown()); msg.textContent = "copied to clipboard."; }
+  catch { msg.textContent = "clipboard blocked: select the text box below and copy it by hand."; }
+});
+</script>
+</body>
+</html>
