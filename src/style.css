@@ -104,6 +104,20 @@ button.expand {
   font-size: 12px;
 }
 
+.relay {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ea;
+}
+
+.relay select {
+  max-width: 100%;
+}
+
+.relay .setting.error {
+  color: #b3261e;
+}
+
 .layers {
   list-style: none;
   margin: 0 0 8px;

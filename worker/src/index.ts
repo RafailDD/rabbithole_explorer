@@ -16,8 +16,12 @@ export interface Env {
   SHIPS: DurableObjectNamespace;
   AISSTREAM_KEY: string;
   WINDY_KEY: string;
-  /** Override for tests: where the Windy API is (default https://api.windy.com). */
-  WINDY_URL?: string;
+  /** Biggest view (degrees) the ships relay accepts; bigger views get "zoom in". */
+  SHIPS_MAX_SPAN_DEG?: string;
+  /** How long a webcam tile is kept, in seconds. */
+  WEBCAM_CACHE_S?: string;
+  /** Tests only: send every HTTPS upstream request through this forwarder as <proxy>/<host>/<path>. */
+  UPSTREAM_PROXY?: string;
   ALLOWED_ORIGINS: string;
   /** Override for tests: a fake upstream (ws:// or http://). */
   AISSTREAM_URL?: string;
@@ -26,7 +30,7 @@ export interface Env {
 const UPSTREAM = "https://stream.aisstream.io/v0/stream";
 const FLUSH_MS = 2000; // send updates to viewers every 2 s
 const STALE_MS = 30 * 60 * 1000; // forget ships not heard for 30 min
-const MAX_SPAN_DEG = 20; // biggest view box we relay (zoom in for more)
+const DEFAULT_MAX_SPAN_DEG = 20; // biggest view box we relay by default (zoom in for more)
 const MAX_VIEWERS = 50;
 // Name of the single relay instance. Changing it starts a fresh instance on the next deploy
 // (an old instance can keep running old code, and its AISStream connection, for a while).
@@ -44,6 +48,11 @@ export default {
     if (url.pathname === "/health") {
       return new Response("ok", { headers: allowed(origin, env) ? { "access-control-allow-origin": origin! } : {} });
     }
+    const air = url.pathname.match(/^\/air\/([a-z]+)(\/.*)$/);
+    if (air) {
+      if (!allowed(origin, env)) return new Response("origin not allowed", { status: 403 });
+      return airProxy(air[1], air[2], env, origin!);
+    }
     const tile = url.pathname.match(/^\/webcams\/tile\/(\d+)\/(\d+)\/(\d+)$/);
     if (tile) {
       if (!allowed(origin, env)) return new Response("origin not allowed", { status: 403 });
@@ -59,9 +68,57 @@ export default {
       if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") return new Response("expected a WebSocket", { status: 426 });
       return env.SHIPS.get(env.SHIPS.idFromName(INSTANCE)).fetch(req);
     }
-    return new Response("rabbithole relay: /ships (WebSocket), /webcams/tile/z/x/y, /health, /status", { status: 404 });
+    return new Response("rabbithole relay: /air/<feed>/<path>, /ships (WebSocket), /webcams/tile/z/x/y, /health, /status", { status: 404 });
   },
 };
+
+/** fetch() for HTTPS upstreams, through the test forwarder when UPSTREAM_PROXY is set. */
+function upstream(url: string, env: Env, init?: RequestInit): Promise<Response> {
+  if (!env.UPSTREAM_PROXY) return fetch(url, init);
+  const u = new URL(url);
+  return fetch(`${env.UPSTREAM_PROXY}/${u.host}${u.pathname}${u.search}`, init);
+}
+
+// ---- Aircraft (adsb.lol, adsb.fi) ----
+//
+// These APIs send no CORS header, so browsers may not read them directly: we fetch them for the
+// page. Only the point-query, single-aircraft and trace paths below are relayed (not an open
+// proxy). Identical requests within 2 s share one upstream fetch (several viewers looking at the
+// same area). x-rhe-relay tells the page who answered: "error" = this relay, "feed" = upstream.
+
+const AIR_FEEDS: Record<string, { base: string; path: RegExp; ttlMs: number }> = {
+  adsblol: { base: "https://api.adsb.lol", path: /^\/v2\/(lat\/-?[\d.]+\/lon\/-?[\d.]+\/dist\/\d+|hex\/[0-9a-f]{6})$/, ttlMs: 2000 },
+  // Today's full path of one aircraft (what adsb.lol's own map loads on click); undocumented.
+  adsbloltrace: { base: "https://adsb.lol/data/traces", path: /^\/[0-9a-f]{2}\/trace_full_[0-9a-f]{6}\.json$/, ttlMs: 30000 },
+  adsbfi: { base: "https://opendata.adsb.fi", path: /^\/api\/(v3\/lat\/-?[\d.]+\/lon\/-?[\d.]+\/dist\/\d+|v2\/hex\/[0-9a-f]{6})$/, ttlMs: 2000 },
+};
+// adsb.lol rejects generic User-Agents and asks for contact info.
+const USER_AGENT = "rabbithole_explorer/0.1 (+https://github.com/RafailDD/rabbithole_explorer; non-commercial hobby map)";
+const airCache = new Map<string, { at: number; status: number; type: string; body: ArrayBuffer }>();
+
+async function airProxy(feedId: string, path: string, env: Env, origin: string): Promise<Response> {
+  const cors = { "access-control-allow-origin": origin, "access-control-expose-headers": "x-rhe-relay", vary: "origin", "cache-control": "no-store" };
+  const feed = AIR_FEEDS[feedId];
+  if (!feed || !feed.path.test(path)) return new Response("unknown feed or path", { status: 404, headers: { ...cors, "x-rhe-relay": "error" } });
+  const key = feedId + path;
+  const hit = airCache.get(key);
+  if (hit && Date.now() - hit.at < feed.ttlMs) {
+    return new Response(hit.body, { status: hit.status, headers: { ...cors, "x-rhe-relay": "feed", "content-type": hit.type } });
+  }
+  try {
+    const res = await upstream(feed.base + path, env, {
+      headers: { "user-agent": USER_AGENT, accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = await res.arrayBuffer();
+    const type = res.headers.get("content-type") ?? "application/json";
+    if (airCache.size > 2000) airCache.clear(); // bounded memory
+    if (res.ok || res.status === 404) airCache.set(key, { at: Date.now(), status: res.status, type, body });
+    return new Response(body, { status: res.status, headers: { ...cors, "x-rhe-relay": "feed", "content-type": type } });
+  } catch (err) {
+    return new Response(`upstream error: ${err instanceof Error ? err.message : String(err)}`, { status: 502, headers: { ...cors, "x-rhe-relay": "error" } });
+  }
+}
 
 // ---- Webcams (Windy Webcams API, free plan) ----
 //
@@ -71,7 +128,6 @@ export default {
 // Windy's terms: key kept secret, only our own pages served (origin check above), image and
 // player URLs passed on unchanged, no bulk scanning (tiles only for what someone looks at).
 
-const TILE_TTL_MS = 10 * 60 * 1000;
 const tileCache = new Map<string, { at: number; body: string }>();
 
 function tileBounds(z: number, x: number, y: number): { n: number; s: number; e: number; w: number } {
@@ -98,7 +154,8 @@ async function webcamTile(z: number, x: number, y: number, env: Env, origin: str
   if (!env.WINDY_KEY?.trim()) return new Response('{"error":"relay has no Windy key (wrangler secret put WINDY_KEY)"}', { status: 503, headers });
   const key = `${z}/${x}/${y}`;
   const hit = tileCache.get(key);
-  if (hit && Date.now() - hit.at < TILE_TTL_MS) return new Response(hit.body, { headers });
+  const ttlMs = (Number(env.WEBCAM_CACHE_S) || 600) * 1000;
+  if (hit && Date.now() - hit.at < ttlMs) return new Response(hit.body, { headers });
   const b = tileBounds(z, x, y);
   const q = new URLSearchParams({
     northLat: b.n.toFixed(5),
@@ -108,7 +165,7 @@ async function webcamTile(z: number, x: number, y: number, env: Env, origin: str
     zoom: String(z),
     include: "location,images,player,urls",
   });
-  const res = await fetch(`${env.WINDY_URL ?? "https://api.windy.com"}/webcams/api/v3/map/clusters?${q}`, {
+  const res = await upstream(`https://api.windy.com/webcams/api/v3/map/clusters?${q}`, env, {
     headers: { "x-windy-api-key": env.WINDY_KEY.trim() },
   });
   if (!res.ok) {
@@ -193,6 +250,8 @@ export class ShipsRelay {
     server.addEventListener("close", bye);
     server.addEventListener("error", bye);
     if (!this.timer) this.timer = setInterval(() => this.flush(), FLUSH_MS);
+    // Tell the page this relay's limits (a self-hosted relay may allow bigger views).
+    this.send(server, { t: "hello", maxSpan: Number(this.env.SHIPS_MAX_SPAN_DEG) || DEFAULT_MAX_SPAN_DEG });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -239,7 +298,8 @@ export class ShipsRelay {
     const box = b as Box;
     const v = this.viewers.get(ws);
     if (!v) return;
-    if (box[2] - box[0] > MAX_SPAN_DEG || box[3] - box[1] > MAX_SPAN_DEG) {
+    const maxSpan = Number(this.env.SHIPS_MAX_SPAN_DEG) || DEFAULT_MAX_SPAN_DEG;
+    if (box[2] - box[0] > maxSpan || box[3] - box[1] > maxSpan) {
       v.box = null;
       this.send(ws, { t: "status", msg: "zoom in to see ships" });
     } else {

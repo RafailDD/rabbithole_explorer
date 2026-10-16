@@ -1,6 +1,6 @@
 import { Popup, type Map as MlMap, type MapLayerMouseEvent } from "maplibre-gl";
 import { FEED_MODE, fixtureUrl } from "../config";
-import { relayUrl } from "../relay";
+import { onRelayChange, relayUrl } from "../relay";
 import { buildCard, closeDetails, showDetails } from "../ui/details";
 import { DataLayer, fetchJson, type FeatureCollection } from "./base";
 
@@ -57,6 +57,10 @@ export class WebcamsLayer extends DataLayer {
   attach(map: MlMap): void {
     super.attach(map);
     map.on("moveend", () => this.refreshSoon(600));
+    onRelayChange(() => {
+      this.tiles.clear();
+      this.refreshSoon(0);
+    });
   }
 
   disable(): void {

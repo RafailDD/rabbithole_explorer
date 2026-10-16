@@ -15,7 +15,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "gateways": "node tools/fetch-gateways.mjs",
-    "streams": "node tools/check-streams.mjs"
+    "streams": "node tools/check-streams.mjs",
+    "setup": "node tools/setup.mjs",
+    "selfhost": "node tools/selfhost.mjs"
   },
   "dependencies": {
     "maplibre-gl": "6.11.2",

@@ -1,5 +1,6 @@
 // Headless-browser smoke test for the map shell (used in Claude's sandbox; optional for you).
-// Needs: a running dev server (`npm run dev`) and Playwright with Chromium.
+// Needs: a running dev server (`npm run dev`) and Playwright with Chromium; the live aircraft,
+// ships and webcam checks also need the relay on :8787 (`cd worker && npx wrangler dev`).
 // Usage:  NODE_PATH=$(npm root -g) node tools/smoke-test.cjs [http://localhost:5173/]
 // Runs with ?basemap=none to keep it fast. The live checks need internet (NO_LIVE=1 skips
 // them); in Claude's sandbox start Vite with NODE_USE_ENV_PROXY=1. Software WebGL, so no
@@ -46,8 +47,8 @@ async function openPage(browser, query, hash = "", withBasemap = false) {
       (r.status() === 404 && /vrs-standing-data|adsbloltrace/.test(r.url())) ||
       (r.status() === 502 && /adsbloltrace/.test(r.url())) ||
       // adsb.lol rate-limits bursts (this test opens many live sessions quickly); the app backs off 30 s.
-      (r.status() === 429 && /\/proxy\//.test(r.url()));
-    if (r.status() === 429) console.log(`INFO  rate-limited by the feed (429): ${r.url().replace(/^.*\/proxy\//, "")}`);
+      (r.status() === 429 && /\/air\//.test(r.url()));
+    if (r.status() === 429) console.log(`INFO  rate-limited by the feed (429): ${r.url().replace(/^.*\/air\//, "")}`);
     if (r.status() >= 400 && !expected404) errors.push(`HTTP ${r.status()} ${r.url()}`);
   });
   page.on("pageerror", (e) => errors.push(e.message));
@@ -61,7 +62,7 @@ async function openPage(browser, query, hash = "", withBasemap = false) {
   page.on("request", (r) => {
     requests.push(r.url());
     if (FIXTURE.test(r.url())) hits.n++;
-    if (r.url().includes("/proxy/")) proxy.n++;
+    if (/:8787\/air\//.test(r.url())) proxy.n++; // aircraft requests go to the relay
     if (/earthquake\.usgs\.gov|quakes-usgs/.test(r.url())) usgs.n++;
     if (/decoder-aircraft|:8090\/data\/aircraft/.test(r.url())) dec.n++;
     if (/celestrak\.org|sats-/.test(r.url())) sat.n++;
@@ -620,6 +621,28 @@ async function expand(page, id) {
     await wl.ctx.close();
   } else console.log("SKIP  webcams live: relay not running on :8787");
 
+  // 8i. Relay picker: local relay answers; a wrong address is explained by the picker and the layers.
+  if (!process.env.NO_LIVE) {
+    const rp = await openPage(browser, "&feeds=live&layers=air", "#7/43.6/7.2");
+    await rp.page.waitForFunction(() => /answering|not reachable|no relay/.test(document.querySelector(".relay .setting")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
+    const up = await fetch("http://localhost:8787/health").then((r) => r.ok, () => false);
+    check((await rp.page.$eval("#relay-select", (s) => s.value)) === "local", "relay picker: defaults to this computer in a local build");
+    check(new RegExp(up ? "relay answering" : "npm run selfhost").test(await rp.page.textContent(".relay .setting")), `relay picker: ${await rp.page.textContent(".relay .setting")}`);
+    await rp.page.selectOption("#relay-select", "custom");
+    await rp.page.fill("#relay-url", "http://localhost:9");
+    await rp.page.press("#relay-url", "Enter");
+    await rp.page.waitForFunction(() => /not reachable/.test(document.querySelector(".relay .setting").textContent), null, { timeout: 8000 }).catch(() => {});
+    check(/not reachable at http:\/\/localhost:9/.test(await rp.page.textContent(".relay .setting")), "relay picker: wrong address explained");
+    await rp.page.waitForFunction(() => /relay not reachable/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 10000 }).catch(() => {});
+    check(/relay not reachable at http:\/\/localhost:9/.test(await rp.page.textContent('[data-status="air"]')), `aircraft: unreachable relay explained (${await rp.page.textContent('[data-status="air"]')})`);
+    await rp.page.selectOption("#relay-select", "local");
+    if (up) {
+      await rp.page.waitForFunction(() => /\d+ aircraft · adsb\.lol/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 20000 }).catch(() => {});
+      check(/\d+ aircraft · adsb\.lol/.test(await rp.page.textContent('[data-status="air"]')), `relay picker: switching back reloads aircraft (${await rp.page.textContent('[data-status="air"]')})`);
+    }
+    await rp.ctx.close();
+  }
+
   // 8e. Background maps (needs internet): switching keeps the data layers and their data.
   if (!process.env.NO_LIVE) {
     const bm = await openPage(browser, "&feeds=fixtures&layers=quakes,air&map=light", "#7/43.6/7.2", true);
@@ -710,8 +733,10 @@ async function expand(page, id) {
   }
   await z.ctx.close();
 
-  // 10. Live feed through the dev proxy (needs internet in the test environment).
-  if (!process.env.NO_LIVE) {
+  // 10. Live aircraft through the relay (needs internet and the relay on :8787).
+  const relayUp = await fetch("http://localhost:8787/health").then((r) => r.ok, () => false);
+  if (!process.env.NO_LIVE && !relayUp) console.log("SKIP  live aircraft: relay not running on :8787");
+  if (!process.env.NO_LIVE && relayUp) {
     const l = await openPage(browser, "&feeds=live&layers=air", "#6.5/46.5/3"); // busy airspace over France
     const liveOk = await l.page
       .waitForFunction(() => /\d+ aircraft · adsb\.lol/.test(document.querySelector('[data-status="air"]').textContent), null, { timeout: 20000 })
