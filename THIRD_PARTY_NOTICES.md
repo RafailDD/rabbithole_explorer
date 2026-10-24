@@ -61,3 +61,11 @@ linked or embedded with YouTube's player.
 
 Dev-only dependencies (not bundled into the app): wrangler (MIT OR Apache-2.0),
 typescript (Apache-2.0).
+
+## Screenshots (`docs/screenshots/`)
+
+Screenshots of the app showing third-party map tiles and data, each with its attribution in the
+image: OpenFreeMap / OpenMapTiles / © OpenStreetMap contributors (ODbL), Sentinel-2 cloudless
+2023 by EOX (CC BY-NC-SA 4.0), aircraft © adsb.lol contributors (ODbL) with routes from VRS
+standing data, earthquakes by USGS (public domain), satellites from the saved CelesTrak sample,
+LoRa gateways from the Packet Broker snapshot. No webcam pictures (Windy's terms).
