@@ -119,7 +119,10 @@ npm run gateways   # refresh the LoRa snapshot (public/data/lora-gateways.json)
 npm run streams    # check that the hand-picked live streams are still live
 ```
 
-`?feeds=fixtures` runs the app on saved sample data (offline, repeatable).
+`.github/workflows/site.yml` type-checks and builds every push, and once the repository is public
+publishes the site to GitHub Pages daily with a fresh LoRa snapshot (repository variable
+`RELAY_URL` = the hosted relay). `?feeds=fixtures` runs the app on saved sample data (offline,
+repeatable).
 `tools/smoke-test.cjs` is a headless browser test (Playwright); `tools/fake-decoder.mjs` is a
 stand-in ADS-B receiver for the antenna overlay. TypeScript + Vite + MapLibre GL JS, no UI
 framework. `CLAUDE.md` holds the detailed design notes.
