@@ -9,8 +9,9 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
 [vars]
-# Pages allowed to use this relay (comma-separated). Add the GitHub Pages address at step 8.
-ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173"
+# Pages allowed to use this relay (comma-separated): local dev/preview and the published site.
+# If you deploy your own copy, put your own site's address here (scheme + host, no path).
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173,https://rafaildd.github.io"
 SHIPS_MAX_SPAN_DEG = "20"
 WEBCAM_CACHE_S = "600"
 

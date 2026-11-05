@@ -1,0 +1,72 @@
+# Build the site (a check on every push and pull request) and publish it on GitHub Pages.
+#
+# - Every push / PR: type-check + build the app and type-check the relay (worker/).
+# - Daily (and on pushes to main): refresh the LoRa gateway snapshot from Packet Broker at
+#   build time, so the published map is at most a day old without committing the file daily.
+# - Publishing runs only when the repository is public (GitHub Pages on free accounts needs a
+#   public repo) and Pages is set to "GitHub Actions" in Settings → Pages.
+#
+# The hosted site talks to the relay in the repository variable RELAY_URL
+# (Settings → Secrets and variables → Actions → Variables), e.g.
+# https://rabbithole-relay.<you>.workers.dev. Without it, the site only offers
+# "This computer" / "Custom" in its Relay picker. Never put keys here: they live in the relay.
+name: Site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * *" # daily, 04:17 UTC (off the hour, when GitHub is busy)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Refresh the LoRa snapshot (keeps the committed one if Packet Broker fails)
+        if: github.event_name != 'pull_request'
+        run: npm run gateways || echo "::warning::LoRa snapshot not refreshed; using the committed one"
+      - name: Type-check and build the app
+        run: npm run build
+        env:
+          VITE_RELAY_URL: ${{ vars.RELAY_URL }}
+      - name: Type-check the relay
+        working-directory: worker
+        run: |
+          npm ci
+          npx wrangler types > /dev/null
+          npx tsc --noEmit
+      - name: Keep the build for publishing
+        if: github.ref == 'refs/heads/main' && !github.event.repository.private
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
