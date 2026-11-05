@@ -11,6 +11,7 @@ export function buildRelayPicker(): HTMLElement {
   wrap.className = "relay";
   const sel = document.createElement("select");
   sel.id = "relay-select";
+  sel.setAttribute("aria-label", "Relay that serves aircraft, ships and webcams");
   const options: [string, string][] = [];
   if (HOSTED_RELAY) options.push(["hosted", "Hosted (shared, nothing to set up)"]);
   options.push(["local", "This computer (npm run selfhost)"], ["custom", "Custom address…"]);
@@ -24,6 +25,7 @@ export function buildRelayPicker(): HTMLElement {
   input.type = "url";
   input.className = "url";
   input.id = "relay-url";
+  input.setAttribute("aria-label", "Custom relay address");
   input.placeholder = "https://rabbithole-relay.<you>.workers.dev";
   const note = document.createElement("div");
   note.className = "setting";
